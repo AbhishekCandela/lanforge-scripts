@@ -1,170 +1,161 @@
 #!/usr/bin/env python3
 """
-NAME: lf_dataplane_test.py
+NAME:       lf_dataplane_test.py
 
-PURPOSE: This script is designed to run dataplane tests under various scenarios.
+PURPOSE:    This script is designed to run dataplane tests under various scenarios.
 
-EXAMPLE:
-        # Sample cli to test Dataplane Test :
-
-        ./lf_dataplane_test.py --mgr localhost --port 8080 --lf_user lanforge --lf_password lanforge
-        --instance_name dataplane-instance --config_name test_con --upstream 1.1.eth1 --dut LISP_VAP_DUT
-        --duration 30s --station 1.1.wlan0 --download_speed 85% --upload_speed 0 --raw_line 'pkts: 60'
-        --raw_line 'cust_pkt_sz: 88 1200' --raw_line 'directions: DUT Transmit' --raw_line 'traffic_types: UDP'
-        --raw_line 'bandw_options: 20' --raw_line 'spatial_streams: 2' --raw_line 'modes: 802.11bgn-AX' --pull_report
-
-
-Example 2:
-
-        # Sample cli to test Dataplane Test with <_dp_cli_config_>.json :
-
-        ./lf_dataplane_test.py --json <name>.json
-
-        The Example/Sample json file should be :
-
-            "lf_dataplane_config.json"
-
-            Sample <name>.json between using eth1 and eth2
-            {
-                "mgr":"192.168.0.101",
-                "port":"8080",
-                "lf_user":"lanforge",
-                "lf_password":"lanforge",
-                "instance_name":"dataplane-instance",
-                "config_name":"test_con",
-                "upstream":"1.1.eth1",
-                "dut":"asus_5g",
-                "duration":"15s",
-                "station":"1.1.eth2",
-                "download_speed":"85%",
-                "upload_speed":"0",
-                "raw_line":  ["pkts: Custom;60;MTU", "cust_pkt_sz: 88 1200", "directions: DUT Transmit",
-                "traffic_types: UDP", "bandw_options: 20", "spatial_streams: 1"]
-            }
-
-            Sample <name>.json between using eth1 and station 1.1.sta0002
-            {
-                "mgr":"192.168.0.101",
-                "port":"8080",
-                "lf_user":"lanforge",
-                "lf_password":"lanforge",
-                "instance_name":"dataplane-instance",
-                "config_name":"test_con",
-                "upstream":"1.1.eth1",
-                "dut":"asus_5g",
-                "duration":"15s",
-                "station":"1.1.sta0002",
-                "download_speed":"85%",
-                "upload_speed":"0",
-                "raw_line":  ["pkts: Custom;60;MTU", "cust_pkt_sz: 88 1200", "directions: DUT Transmit",
-                "traffic_types: UDP", "bandw_options: 20", "spatial_streams: 1"]
-            }
-
-SCRIPT_CLASSIFICATION:  Test
-
-SCRIPT_CATEGORIES:   Performance,  Functional,  KPI Generation,  Report Generation
-
-NOTES:
-        This script is used to automate running Dataplane tests.  You may need to view a Dataplane test
-        configured through the GUI to understand the options and how best to input data.
-
-        Note :
-                To Run this script gui should be opened with
-
-                path: cd LANforgeGUI_5.4.3 (5.4.3 can be changed with GUI version)
-                        pwd (Output : /home/lanforge/LANforgeGUI_5.4.3)
-                        ./lfclient.bash -cli-socket 3990
-
-        ---> lf_dataplane_test.py is designed to run dataplane tests under various scenarios.
+EXAMPLE:    # Sample cli to test Dataplane Test :
 
             ./lf_dataplane_test.py --mgr localhost --port 8080 --lf_user lanforge --lf_password lanforge
-            --instance_name <instance name> --config_name test_con --upstream <upstream port> --dut <dut name>
-            --duration <test duration> --station <staion name> --download_speed <download rate> --upload_speed <Opposit rate>
-            --raw_line 'pkts: 60' --raw_line 'cust_pkt_sz: 88 1200' --raw_line 'directions: DUT Transmit'
-            --raw_line 'traffic_types: UDP' --raw_line 'bandw_options: 20' --raw_line 'spatial_streams: 2'
-            --raw_line 'modes: 802.11bgn-AX' --pull_report
+            --instance_name dataplane-instance --config_name test_con --upstream 1.1.eth1 --dut LISP_VAP_DUT
+            --duration 30s --station 1.1.wlan0 --download_speed 85% --upload_speed 0 --raw_line 'pkts: 60'
+            --raw_line 'cust_pkt_sz: 88 1200' --raw_line 'directions: DUT Transmit' --raw_line 'traffic_types: UDP'
+            --raw_line 'bandw_options: 20' --raw_line 'spatial_streams: 2' --raw_line 'modes: 802.11bgn-AX' --pull_report
 
-            *   --raw_line : 'line contents' will add any setting to the test config.  This is useful way to support
-                        any options not specifically enabled by the command options.
+Example 2:  # Sample cli to test Dataplane Test with <_dp_cli_config_>.json :
 
-            *  --set modifications will be applied after the other config has happened, so it can be used to
-                        override any other config.
+            ./lf_dataplane_test.py --json <name>.json
 
-    Example of raw text config for Dataplane, to show other possible options:
+            The Example/Sample json file should be :
 
-    show_events: 1
-    show_log: 0
-    port_sorting: 0
-    kpi_id: Dataplane Pkt-Size
-    notes0: ec5211 in bridge mode, wpa2 auth.
-    bg: 0xE0ECF8
-    test_rig:
-    show_scan: 1
-    auto_helper: 0
-    skip_2: 0
-    skip_5: 0
-    skip_5b: 1
-    skip_dual: 0
-    skip_tri: 1
-    selected_dut: ea8300
-    duration: 15000
-    traffic_port: 1.1.157 sta01500
-    upstream_port: 1.1.2 eth2
-    path_loss: 10
-    speed: 85%
-    speed2: 0Kbps
-    min_rssi_bound: -150
-    max_rssi_bound: 0
-    channels: AUTO
-    modes: Auto
-    pkts: Custom;60;142;256;512;1024;MTU
-    spatial_streams: AUTO
-    security_options: AUTO
-    bandw_options: AUTO
-    traffic_types: UDP;TCP
-    directions: DUT Transmit;DUT Receive
-    txo_preamble: OFDM
-    txo_mcs: 0 CCK, OFDM, HT, VHT
-    txo_retries: No Retry
-    txo_sgi: OFF
-    txo_txpower: 15
-    attenuator: 0
-    attenuator2: 0
-    attenuator_mod: 255
-    attenuator_mod2: 255
-    attenuations: 0..+50..950
-    attenuations2: 0..+50..950
-    chamber: 0
-    tt_deg: 0..+45..359
-    cust_pkt_sz: 88 1200
-    show_bar_labels: 1
-    show_prcnt_tput: 0
-    show_3s: 0
-    show_ll_graphs: 0
-    show_gp_graphs: 1
-    show_1m: 1
-    pause_iter: 0
-    outer_loop_atten: 0
-    show_realtime: 1
-    operator:
-    mconn: 1
-    mpkt: 1000
-    tos: 0
-    loop_iterations: 1
+                "lf_dataplane_config.json"
 
+                Sample <name>.json between using eth1 and eth2
+                {
+                    "mgr":"192.168.0.101",
+                    "port":"8080",
+                    "lf_user":"lanforge",
+                    "lf_password":"lanforge",
+                    "instance_name":"dataplane-instance",
+                    "config_name":"test_con",
+                    "upstream":"1.1.eth1",
+                    "dut":"asus_5g",
+                    "duration":"15s",
+                    "station":"1.1.eth2",
+                    "download_speed":"85%",
+                    "upload_speed":"0",
+                    "raw_line":  ["pkts: Custom;60;MTU", "cust_pkt_sz: 88 1200", "directions: DUT Transmit",
+                    "traffic_types: UDP", "bandw_options: 20", "spatial_streams: 1"]
+                }
 
-STATUS: Functional
+                Sample <name>.json between using eth1 and station 1.1.sta0002
+                {
+                    "mgr":"192.168.0.101",
+                    "port":"8080",
+                    "lf_user":"lanforge",
+                    "lf_password":"lanforge",
+                    "instance_name":"dataplane-instance",
+                    "config_name":"test_con",
+                    "upstream":"1.1.eth1",
+                    "dut":"asus_5g",
+                    "duration":"15s",
+                    "station":"1.1.sta0002",
+                    "download_speed":"85%",
+                    "upload_speed":"0",
+                    "raw_line":  ["pkts: Custom;60;MTU", "cust_pkt_sz: 88 1200", "directions: DUT Transmit",
+                    "traffic_types: UDP", "bandw_options: 20", "spatial_streams: 1"]
+                }
 
-VERIFIED_ON:   11-MAY-2023,
-             GUI Version:  5.4.6
-             Kernel Version: 6.2.14+
+SCRIPT_CLASSIFICATION:
+            Test
 
-LICENSE:
-          Free to distribute and modify. LANforge systems must be licensed.
-          Copyright 2023 Candela Technologies Inc
+SCRIPT_CATEGORIES:
+            Performance,  Functional,  KPI Generation,  Report Generation
 
-INCLUDE_IN_README: False
+NOTES:      This script is used to automate running Dataplane tests.  You may need to view a Dataplane test
+            configured through the GUI to understand the options and how best to input data.
 
+            Note :
+                    To Run this script gui should be opened with
+
+                    path: cd LANforgeGUI_5.4.3 (5.4.3 can be changed with GUI version)
+                            pwd (Output : /home/lanforge/LANforgeGUI_5.4.3)
+                            ./lfclient.bash -cli-socket 3990
+
+            ---> lf_dataplane_test.py is designed to run dataplane tests under various scenarios.
+
+                ./lf_dataplane_test.py --mgr localhost --port 8080 --lf_user lanforge --lf_password lanforge
+                --instance_name <instance name> --config_name test_con --upstream <upstream port> --dut <dut name>
+                --duration <test duration> --station <staion name> --download_speed <download rate> --upload_speed <Opposit rate>
+                --raw_line 'pkts: 60' --raw_line 'cust_pkt_sz: 88 1200' --raw_line 'directions: DUT Transmit'
+                --raw_line 'traffic_types: UDP' --raw_line 'bandw_options: 20' --raw_line 'spatial_streams: 2'
+                --raw_line 'modes: 802.11bgn-AX' --pull_report
+
+                *   --raw_line : 'line contents' will add any setting to the test config.  This is useful way to support
+                            any options not specifically enabled by the command options.
+
+                *  --set modifications will be applied after the other config has happened, so it can be used to
+                            override any other config.
+
+            Example of raw text config for Dataplane, to show other possible options:
+
+            show_events: 1
+            show_log: 0
+            port_sorting: 0
+            kpi_id: Dataplane Pkt-Size
+            notes0: ec5211 in bridge mode, wpa2 auth.
+            bg: 0xE0ECF8
+            test_rig:
+            show_scan: 1
+            auto_helper: 0
+            skip_2: 0
+            skip_5: 0
+            skip_5b: 1
+            skip_dual: 0
+            skip_tri: 1
+            selected_dut: ea8300
+            duration: 15000
+            traffic_port: 1.1.157 sta01500
+            upstream_port: 1.1.2 eth2
+            path_loss: 10
+            speed: 85%
+            speed2: 0Kbps
+            min_rssi_bound: -150
+            max_rssi_bound: 0
+            channels: AUTO
+            modes: Auto
+            pkts: Custom;60;142;256;512;1024;MTU
+            spatial_streams: AUTO
+            security_options: AUTO
+            bandw_options: AUTO
+            traffic_types: UDP;TCP
+            directions: DUT Transmit;DUT Receive
+            txo_preamble: OFDM
+            txo_mcs: 0 CCK, OFDM, HT, VHT
+            txo_retries: No Retry
+            txo_sgi: OFF
+            txo_txpower: 15
+            attenuator: 0
+            attenuator2: 0
+            attenuator_mod: 255
+            attenuator_mod2: 255
+            attenuations: 0..+50..950
+            attenuations2: 0..+50..950
+            chamber: 0
+            tt_deg: 0..+45..359
+            cust_pkt_sz: 88 1200
+            show_bar_labels: 1
+            show_prcnt_tput: 0
+            show_3s: 0
+            show_ll_graphs: 0
+            show_gp_graphs: 1
+            show_1m: 1
+            pause_iter: 0
+            outer_loop_atten: 0
+            show_realtime: 1
+            operator:
+            mconn: 1
+            mpkt: 1000
+            tos: 0
+            loop_iterations: 1
+
+STATUS:     Functional
+
+LICENSE:    Free to distribute and modify. LANforge systems must be licensed.
+            Copyright 2025 Candela Technologies Inc.
+
+INCLUDE_IN_README:
+            False
 """
 import sys
 import os
@@ -217,47 +208,40 @@ class DataplaneTest(cv_test):
                  graph_groups=None,
                  test_rig="",
                  test_tag="",
-                 verbosity='5'
-                 ):
+                 verbosity='5',
+                 **kwargs):
         super().__init__(lfclient_host=lf_host, lfclient_port=lf_port)
 
-        # NOTE: Do not move these into the function definition.
-        #       Otherwise, they will become immutable lists
-        if enables is None:
-            enables = []
-        if disables is None:
-            disables = []
-        if raw_lines is None:
-            raw_lines = []
-        if sets is None:
-            sets = []
-
+        # From CV base argument parser
         self.lf_host = lf_host
         self.lf_port = lf_port
         self.lf_user = lf_user
         self.lf_password = lf_password
+        self.ssh_port = ssh_port
         self.instance_name = instance_name
         self.config_name = config_name
-        self.dut = dut
-        self.duration = duration
-        self.upstream = upstream
-        self.station = station
         self.pull_report = pull_report
         self.load_old_cfg = load_old_cfg
-        self.test_name = "Dataplane"
-        self.upload_speed = upload_speed
-        self.download_speed = download_speed
         self.enables = enables
         self.disables = disables
+        self.sets = sets
         self.raw_lines = raw_lines
         self.raw_lines_file = raw_lines_file
-        self.sets = sets
-        self.graph_groups = graph_groups
-        self.ssh_port = ssh_port
-        self.local_lf_report_dir = local_lf_report_dir
         self.test_rig = test_rig
         self.test_tag = test_tag
+
+        # Specific to this test script
+        self.test_name = "Dataplane"
+
+        self.upstream = upstream
+        self.station = station
+        self.dut = dut
+        self.upload_speed = upload_speed
+        self.download_speed = download_speed
+        self.duration = duration
         self.verbosity = verbosity
+        self.graph_groups = graph_groups
+        self.local_lf_report_dir = local_lf_report_dir
 
     def setup(self):
         # Nothing to do at this time.
@@ -333,19 +317,8 @@ class DataplaneTest(cv_test):
                           blob_test_name=blob_test)
 
 
-def main():
-    help_summary = "The Candela Tech WiFi data plane test is designed to conduct an automatic testing of " \
-                   "all combinations of station types, MIMO types, Channel Bandwidths, Traffic types, " \
-                   "Traffic direction, Frame sizes etc… It will run a quick throughput test at every " \
-                   "combination of these test variables and plot all the results in a set of charts to " \
-                   "compare performance. The user is allowed to define an intended load as a percentage " \
-                   "of the max theoretical PHY rate for every test combination. The expected behavior " \
-                   "is that for every test combination the achieved throughput should be at least 70%% " \
-                   "of the theoretical max PHY rate under ideal test conditions. This test provides " \
-                   "a way to go through hundreds of combinations in a fully automated fashion and " \
-                   "very easily find patterns and problem areas which can be further " \
-                   "debugged using more specific testing."
-
+def parse_args():
+    """Parse test script arguments."""
     parser = argparse.ArgumentParser(
         prog='lf_dataplane_test',
         formatter_class=argparse.RawTextHelpFormatter,
@@ -522,10 +495,13 @@ INCLUDE_IN_README: False
 
     cv_add_base_parser(parser)  # see cv_test_manager.py
 
+    # Test configuration
     parser.add_argument('--json',
                         help="Path to JSON configuration file for test. When specified, JSON takes precedence over command line args.",
                         default="")
+
     parser.add_argument("-u", "--upstream",
+                        dest="upstream",
                         type=str,
                         default="",
                         help="Upstream port used in test. For example, \'1.1.eth2\'")
@@ -536,12 +512,16 @@ INCLUDE_IN_README: False
     parser.add_argument("--dut",
                         default="",
                         help="Name of DUT used in test. Assumes DUT is already configured in LANforge. Example: \'linksys-8450\'")
-    parser.add_argument("--download_speed",
+
+    parser.add_argument("--download_rate", "--download_speed",
+                        dest="download_speed",
                         default="",
                         help="Requested download speed used in test. Percentage of theoretical is also supported. Default: 85%%.")
-    parser.add_argument("--upload_speed",
+    parser.add_argument("--upload_rate", "--upload_speed",
+                        dest="upload_speed",
                         default="",
                         help="Requested upload speed used in test. Percentage of theoretical is also supported. Default: 0")
+
     parser.add_argument("--duration",
                         default="",
                         help="Duration of each traffic run")
@@ -549,6 +529,8 @@ INCLUDE_IN_README: False
                         default="5",
                         help="Verbosity of the report specified as single value in 1 - 11 range (whole numbers).\n"
                              "The larger the number, the more verbose. Default: 5")
+
+    # Report generation
     parser.add_argument("--graph_groups",
                         help="Path to file to save graph_groups to on local system",
                         default=None)
@@ -556,76 +538,33 @@ INCLUDE_IN_README: False
                         help="Path to directory to pull remote report data to on local system",
                         default="")
 
+    # Logging configuration
     parser.add_argument("--lf_logger_config_json",
                         help="Path to logger JSON configuration")
-    parser.add_argument('--help_summary',
-                        default=None,
-                        action="store_true",
-                        help='Show summary of what this script does')
     parser.add_argument('--logger_no_file',
                         default=None,
                         action="store_true",
                         help='Show loggingout without the trailing file name and line')
 
-    # TODO:  Add debug and log-level support, and propagate as needed.
-    # TODO:  Add ability to pull from a machine that is not running the
-    #   GUI, for instance when GUI is running locally against a remote LANforge system.
+    parser.add_argument('--help_summary',
+                        default=None,
+                        action="store_true",
+                        help='Show summary of what this script does')
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    if args.help_summary:
-        print(help_summary)
-        exit(0)
 
-    # set up logger
+def configure_logging(args):
+    """
+    Configure logging for execution of this script.
+
+    Any specified JSON configuration takes precedence.
+    """
     logger_config = lf_logger_config.lf_logger_config()
 
-    # lf_logger_config_json will take presidence to changing debug levels
     if args.lf_logger_config_json:
         logger_config.lf_logger_config_json = args.lf_logger_config_json
         logger_config.load_lf_logger_config()
-
-    # use json config file
-    if args.json:
-        if os.path.exists(args.json):
-            with open(args.json, 'r') as json_config:
-                json_data = json.load(json_config)
-        else:
-            return FileNotFoundError("Error reading {}".format(args.json))
-        # json configuation takes presidence to command line
-        if "mgr" in json_data:
-            args.mgr = json_data["mgr"]
-        if "port" in json_data:
-            args.port = json_data["port"]
-        if "lf_user" in json_data:
-            args.lf_user = json_data["lf_user"]
-        if "lf_password" in json_data:
-            args.lf_password = json_data["lf_password"]
-        if "instance_name" in json_data:
-            args.instance_name = json_data["instance_name"]
-        if "config_name" in json_data:
-            args.config_name = json_data["config_name"]
-        if "upstream" in json_data:
-            args.upstream = json_data["upstream"]
-        if "dut" in json_data:
-            args.dut = json_data["dut"]
-        if "duration" in json_data:
-            args.duration = json_data["duration"]
-        if "station" in json_data:
-            args.station = json_data["station"]
-        if "download_speed" in json_data:
-            args.download_speed = json_data["download_speed"]
-        if "upload_speed" in json_data:
-            args.upload_speed = json_data["upload_speed"]
-        if "pull_report" in json_data:
-            args.pull_report = json_data["pull_report"]
-        if "raw_line" in json_data:
-            # the json_data is a list , need to make into a list of lists, to match command line raw_line paramaters
-            # https://www.tutorialspoint.com/convert-list-into-list-of-lists-in-python
-            json_data_tmp = [[x] for x in json_data["raw_line"]]
-            args.raw_line = json_data_tmp
-
-    cv_base_adjust_parser(args)
 
     if args.logger_no_file:
         f = '%(created)f %(levelname)-8s %(message)s'
@@ -633,30 +572,87 @@ INCLUDE_IN_README: False
         for handler in logging.getLogger().handlers:
             handler.setFormatter(ff)
 
+
+def apply_json_overrides(args):
+    """
+    Apply JSON configuration, if specified.
+
+    JSON configuration takes precedent over arguments specified on the command line.
+    """
+    if not args.json:
+        return
+
+    if os.path.exists(args.json):
+        with open(args.json, 'r') as json_config:
+            json_data = json.load(json_config)
+    else:
+        logger.error(f"Error reading JSON configuration file '{args.json}'")
+        exit(1)
+
+    if "mgr" in json_data:
+        args.mgr = json_data["mgr"]
+    if "port" in json_data:
+        args.port = json_data["port"]
+    if "lf_user" in json_data:
+        args.lf_user = json_data["lf_user"]
+    if "lf_password" in json_data:
+        args.lf_password = json_data["lf_password"]
+    if "instance_name" in json_data:
+        args.instance_name = json_data["instance_name"]
+    if "config_name" in json_data:
+        args.config_name = json_data["config_name"]
+    if "upstream" in json_data:
+        args.upstream = json_data["upstream"]
+    if "dut" in json_data:
+        args.dut = json_data["dut"]
+    if "duration" in json_data:
+        args.duration = json_data["duration"]
+    if "station" in json_data:
+        args.station = json_data["station"]
+    if "download_speed" in json_data:
+        args.download_speed = json_data["download_speed"]
+    if "upload_speed" in json_data:
+        args.upload_speed = json_data["upload_speed"]
+    if "pull_report" in json_data:
+        args.pull_report = json_data["pull_report"]
+    if "raw_line" in json_data:
+        # the json_data is a list , need to make into a list of lists, to match command line raw_line paramaters
+        # https://www.tutorialspoint.com/convert-list-into-list-of-lists-in-python
+        json_data_tmp = [[x] for x in json_data["raw_line"]]
+        args.raw_line = json_data_tmp
+
+
+def main():
+    args = parse_args()
+
+    help_summary = "The Candela Tech WiFi data plane test is designed to conduct an automatic testing of " \
+                   "all combinations of station types, MIMO types, Channel Bandwidths, Traffic types, " \
+                   "Traffic direction, Frame sizes etc… It will run a quick throughput test at every " \
+                   "combination of these test variables and plot all the results in a set of charts to " \
+                   "compare performance. The user is allowed to define an intended load as a percentage " \
+                   "of the max theoretical PHY rate for every test combination. The expected behavior " \
+                   "is that for every test combination the achieved throughput should be at least 70%% " \
+                   "of the theoretical max PHY rate under ideal test conditions. This test provides " \
+                   "a way to go through hundreds of combinations in a fully automated fashion and " \
+                   "very easily find patterns and problem areas which can be further " \
+                   "debugged using more specific testing."
+    if args.help_summary:
+        print(help_summary)
+        exit(0)
+
+    configure_logging(args)
+    cv_base_adjust_parser(args)
+
+    apply_json_overrides(args)
+
     CV_Test = DataplaneTest(lf_host=args.mgr,
                             lf_port=args.port,
-                            lf_user=args.lf_user,
-                            lf_password=args.lf_password,
-                            instance_name=args.instance_name,
-                            config_name=args.config_name,
-                            upstream=args.upstream,
-                            pull_report=args.pull_report,
-                            local_lf_report_dir=args.local_lf_report_dir,
-                            load_old_cfg=args.load_old_cfg,
-                            download_speed=args.download_speed,
-                            upload_speed=args.upload_speed,
-                            duration=args.duration,
-                            dut=args.dut,
-                            station=args.station,
+                            ssh_port=args.lf_ssh_port,
                             enables=args.enable,
                             disables=args.disable,
-                            raw_lines=args.raw_line,
-                            raw_lines_file=args.raw_lines_file,
                             sets=args.set,
-                            graph_groups=args.graph_groups,
-                            test_rig=args.test_rig,
-                            verbosity=args.verbosity
-                            )
+                            raw_lines=args.raw_line,
+                            **vars(args))
     CV_Test.setup()
     CV_Test.run()
 
