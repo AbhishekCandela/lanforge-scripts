@@ -177,3 +177,4 @@ config/secrets.*
 *.pem
 credentials.json
 api_keys.txt
+config/secrets.json
