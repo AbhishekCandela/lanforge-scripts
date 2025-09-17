@@ -1,0 +1,4 @@
+Iteration,Total Iterations,IP,Device Type,Download,Upload,Idle Latency,Download Latency,Upload Latency
+1,1,192.168.204.94,Windows,42.47 Mbps,44.75 Mbps,7 ms,27 ms,119 ms
+1,1,192.168.204.54,Android,25.5 Mbps,50.6 Mbps,114 ms,248 ms,173 ms
+1,1,192.168.204.66,Android,N/A,N/A,N/A,N/A,N/A

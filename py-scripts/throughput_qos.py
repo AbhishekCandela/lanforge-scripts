@@ -68,9 +68,11 @@ import argparse
 import time
 import sys
 import os
+import csv
+import subprocess
 import pandas as pd
 import importlib
-import copy
+import copy 
 
 if sys.version_info[0] != 3:
     print("This script requires Python 3")
@@ -103,6 +105,9 @@ class ThroughputQOS(Realm):
                  ssid_6g=None,
                  security_6g=None,
                  password_6g=None,
+                 hotspot_ssid=None,
+                 hotspot_security=None,
+                 hotspot_password=None,
                  create_sta=True,
                  name_prefix=None,
                  upstream=None,
@@ -129,6 +134,7 @@ class ThroughputQOS(Realm):
                  channel_list=None,
                  mac_list=None,
                  use_ht160=False,
+                 hotspot=False,
                  _debug_on=False,
                  _exit_on_error=False,
                  _exit_on_fail=False):
@@ -193,6 +199,7 @@ class ThroughputQOS(Realm):
         self.station_profile.use_ht160 = use_ht160
         if self.station_profile.use_ht160:
             self.station_profile.mode = 14
+        self.hotspot = hotspot
         # self.station_profile.mode = mode
         self.cx_profile.host = self.host
         self.cx_profile.port = self.port
@@ -231,6 +238,63 @@ class ThroughputQOS(Realm):
             self.station_profile.cleanup()
             LFUtils.wait_until_ports_disappear(base_url=self.lfclient_url, port_list=self.station_profile.station_names,
                                                debug=self.debug)
+
+    def check_phantom(self, target_serial):
+        is_phantom = None
+        adb_data = self.json_get("/adb/all")["devices"]
+        print(adb_data)
+        for device_entry in adb_data:
+            for serial, info in device_entry.items():
+                if serial.endswith(target_serial):
+                    is_phantom = info.get("phantom", None)
+
+        if is_phantom is None:
+            print(f"Device {target_serial} not found in /adb/all")
+        elif is_phantom:
+            print(f"Device {target_serial} is a PHANTOM device")
+        else:
+            print(f"Device {target_serial} is a VALID (non-phantom) device")
+
+        return is_phantom
+
+    @staticmethod
+    def get_data_from_csv(csv_name, selected_resource_ids=None):
+        device_details = {}
+        selected_set = set(selected_resource_ids) if selected_resource_ids else None
+
+        with open(csv_name, mode='r', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                resource_id = row['Resource_Id'].strip()
+                if selected_set and resource_id not in selected_set:
+                    continue
+
+                full_serial = row['Device_serial'].strip()
+                serial = full_serial.split('.')[-1]
+                device_details[serial] = row
+        return device_details
+
+
+    def run_remote_toggle(self, serial, remote_script_path="hotspot.py"):
+        remote_cmd = f"python3 {remote_script_path} --serial {serial}"
+        print(f"SSH to {self.manager_ip} and run: {remote_cmd}")
+        try:
+            subprocess.run([
+                "sshpass", "-p", "lanforge",
+                "ssh", "-o", "StrictHostKeyChecking=no",
+                f"lanforge@{self.manager_ip}", remote_cmd
+            ], check=True)
+            print("Remote toggle executed successfully.")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] SSH command failed: {e}")
+
+        print("Waiting for device toggling to complete...")
+        time.sleep(10)
+
+    def Enable_hotspot(self, serial):
+        if not self.check_phantom(serial):
+            self.run_remote_toggle(serial)
+
 
     def build(self):
         for key in self.bands:
@@ -370,7 +434,19 @@ class ThroughputQOS(Realm):
                         print("Set initial band preference to 6GHz")
                     self.station_profile.set_wifi_extra2(initial_band_pref=band_pref)
                     self.station_profile.create(radio=self.radio_6g, sta_names_=self.sta_list[split_2:], debug=self.debug)
-
+                if self.hotspot:
+                    # self.station_profile.mode = 13
+                    self.station_profile.use_security(self.hotspot_security, self.hotspot_ssid, self.hotspot_password)
+                    self.station_profile.set_number_template(self.number_template)
+                    print("Creating stations")
+                    self.station_profile.set_command_flag("add_sta", "create_admin_down", 1)
+                    self.station_profile.set_command_param("set_port", "report_timer", 1500)
+                    self.station_profile.set_command_flag("set_port", "rpt_timer", 1)
+                    if self.initial_band_pref:
+                        band_pref = 2
+                        print("Set initial band preference to 2.4GHz")
+                    self.station_profile.set_wifi_extra2(initial_band_pref=band_pref)
+                    self.station_profile.create(radio=self.hotspot_radio, sta_names_=self.sta_list, debug=self.debug)
                 # Bring all stations up
                 self.station_profile.admin_up()
                 # check here if upstream port got IP
@@ -861,12 +937,20 @@ class ThroughputQOS(Realm):
         report.set_title("Throughput QOS")
         report.build_banner()
         # objective title and description
-        report.set_obj_html(_obj_title="Objective",
-                            _obj="The objective of the QoS (Quality of Service) traffic throughput test is to measure the maximum"
-                            " achievable throughput of a network under specific QoS settings and conditions.By conducting"
-                            " this test, we aim to assess the capacity of network to handle high volumes of traffic while"
-                            " maintaining acceptable performance levels,ensuring that the network meets the required QoS"
-                            " standards and can adequately support the expected user demands.")
+        if self.hotspot:
+            report.set_obj_html(_obj_title="Objective",
+                                _obj="The objective of the Android Hotspot automation test is to validate the functionality,"
+                                "  reliability, and performance of Android devices operating as Soft Access Points (Soft APs)."
+                                "  By automating hotspot enable/disable operations, client association, and traffic generation over multiple iterations,"
+                                "  this test aims to assess the ability of these Soft APs to support concurrent virtual station connections,"
+                                "  sustain traffic loads, and maintain stable performance. The test ensures that Android-based Soft APs meet expected behavioral and throughput standards under realistic usage conditions")          
+        else:
+            report.set_obj_html(_obj_title="Objective",
+                                _obj="The objective of the QoS (Quality of Service) traffic throughput test is to measure the maximum"
+                                " achievable throughput of a network under specific QoS settings and conditions.By conducting"
+                                " this test, we aim to assess the capacity of network to handle high volumes of traffic while"
+                                " maintaining acceptable performance levels,ensuring that the network meets the required QoS"
+                                " standards and can adequately support the expected user demands.")
         report.build_objective()
 
         test_setup_info = {
@@ -1425,6 +1509,9 @@ LICENSE:    Free to distribute and modify. LANforge systems must be licensed.
     parser.add_argument('--initial_band_pref',
                         help="If specified, set a band preference for stations created for specific band",
                         required=False, action='store_true', default=False)
+    parser.add_argument("--hotspot", action="store_true", help="Specify for using mobile hotspot.")
+    parser.add_argument("--hotspot_csv", default="hotspot_details.csv", help="Specify csv containing hotspot details.")
+    parser.add_argument("--resources", help="Specify device resource that needs to be enable hotspot")
 
     return parser.parse_args()
 
@@ -1461,7 +1548,8 @@ def main():
         exit(0)
 
     # This must come after help summary check
-    validate_args(args)
+    if not args.hotspot:
+        validate_args(args)
 
     print("--------------------------------------------")
     print(args)
@@ -1502,142 +1590,198 @@ def main():
     test_start_time = datetime.now().strftime("%b %d %H:%M:%S")
     print("Test started at: ", test_start_time)
 
-    for i in range(len(bands)):
-        if bands[i] == "2.4G" or bands[i] == "2.4g":
-            args.bands = bands[i]
-            args.mode = 13
-            if args.create_sta:
-                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_2g) - 1,
-                                                      padding_number_=10000, radio=args.radio_2g)
+    if args.hotspot:    
+        if args.hotspot and args.hotspot_csv:
+            # resources
+            resource_ids = [r.strip() for r in args.resources.split(",")]
+            device_details = ThroughputQOS.get_data_from_csv(csv_name=args.hotspot_csv, selected_resource_ids=resource_ids)
+
+            for device_data in device_details:
+                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(device_details[device_data]["Max_Clients_Supported"]) - 1,
+                                                        padding_number_=10000, radio=args.radio)
+
+                throughput_qos = ThroughputQOS(host=args.mgr,
+                                            port=args.mgr_port,
+                                            number_template="0000",
+                                            name_prefix="TOS-",
+                                            upstream=args.upstream_port,
+                                            sta_list=station_list,
+                                            hotspot_ssid=device_details[device_data]['Hotspot_Name'],
+                                            hotspot_password=device_details[device_data]['Hotspot_Password'],
+                                            hotspot_security=device_details[device_data]['Security_Type'],
+                                            radio=args.radio,
+                                            test_duration=args.test_duration,
+                                            side_a_min_rate=int(loads['upload'][0]),
+                                            side_b_min_rate=int(loads['download'][0]),
+                                            traffic_type=args.traffic_type,
+                                            tos=args.tos,
+                                            hotspot=args.hotspot
+                                            )
+
+                throughput_qos.Enable_hotspot(device_data)
+                throughput_qos.pre_cleanup()
+                throughput_qos.build()
+
+                throughput_qos.start(False, False)
+                time.sleep(10)
+                connections_download, connections_upload, drop_a_per, drop_b_per = throughput_qos.monitor()
+                print("connections download", connections_download)
+                print("connections upload", connections_upload)
+                throughput_qos.stop()
+                time.sleep(5)
+                test_results['test_results'].append(throughput_qos.evaluate_qos(connections_download, connections_upload, drop_a_per, drop_b_per))
+                data.update({'0': test_results})
+                input_setup_info = {
+                    "contact": "support@candelatech.com"
+                }
+
+                throughput_qos.generate_report(data=data, input_setup_info=input_setup_info)
+                if args.create_sta:
+                    if not throughput_qos.passes():
+                        print(throughput_qos.get_fail_message())
+                        throughput_qos.exit_fail()
+                    # LFUtils.wait_until_ports_admin_up(port_list=station_list)
+                    if throughput_qos.passes():
+                        throughput_qos.success()
+                    throughput_qos.cleanup()
+
+    else:
+        for i in range(len(bands)):
+            if bands[i] == "2.4G" or bands[i] == "2.4g":
+                args.bands = bands[i]
+                args.mode = 13
+                if args.create_sta:
+                    station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_2g) - 1,
+                                                        padding_number_=10000, radio=args.radio_2g)
+                else:
+                    station_list = args.sta_names.split(",")
+            elif bands[i] == "5G" or bands[i] == "5g":
+                args.bands = bands[i]
+                args.mode = 14
+                if args.create_sta:
+                    station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_5g) - 1,
+                                                        padding_number_=10000,
+                                                        radio=args.radio_5g)
+                else:
+                    station_list = args.sta_names.split(",")
+            elif bands[i] == "6G" or bands[i] == "6g":
+                args.bands = bands[i]
+                args.mode = 14
+                if args.create_sta:
+                    station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_6g) - 1,
+                                                        padding_number_=10000,
+                                                        radio=args.radio_6g)
+                else:
+                    station_list = args.sta_names.split(",")
+            elif bands[i] == "dualband" or bands[i] == "DUALBAND":
+                args.bands = bands[i]
+                args.mode = 0
+                if args.create_sta:
+                    station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=(int(args.num_stations_2g)) - 1,
+                                                        padding_number_=10000,
+                                                        radio=args.radio_2g)
+                    station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g),
+                                                            end_id_=((int(args.num_stations_2g)) + (int(args.num_stations_5g))) - 1,
+                                                            padding_number_=10000,
+                                                            radio=args.radio_5g))
+            elif bands[i] == "triband" or bands[i] == "TRIBAND":
+                args.bands = bands[i]
+                args.mode = 0
+                if args.create_sta:
+                    # 2.4GHz stations
+                    station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0,
+                                                        end_id_=int(args.num_stations_2g) - 1,
+                                                        padding_number_=10000,
+                                                        radio=args.radio_2g)
+
+                    # 5GHz stations
+                    station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g),
+                                                            end_id_=int(args.num_stations_2g) + int(args.num_stations_5g) - 1,
+                                                            padding_number_=10000,
+                                                            radio=args.radio_5g))
+
+                    # 6GHz stations (Fixed to use `radio_6g`)
+                    station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g) + int(args.num_stations_5g),
+                                                            end_id_=int(args.num_stations_2g) + int(args.num_stations_5g) + int(args.num_stations_6g) - 1,
+                                                            padding_number_=10000,
+                                                            radio=args.radio_6g))
+
+                    print(station_list)
+
+                else:
+                    station_list = args.sta_names.split(",")
             else:
-                station_list = args.sta_names.split(",")
-        elif bands[i] == "5G" or bands[i] == "5g":
-            args.bands = bands[i]
-            args.mode = 14
-            if args.create_sta:
-                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_5g) - 1,
-                                                      padding_number_=10000,
-                                                      radio=args.radio_5g)
-            else:
-                station_list = args.sta_names.split(",")
-        elif bands[i] == "6G" or bands[i] == "6g":
-            args.bands = bands[i]
-            args.mode = 14
-            if args.create_sta:
-                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=int(args.num_stations_6g) - 1,
-                                                      padding_number_=10000,
-                                                      radio=args.radio_6g)
-            else:
-                station_list = args.sta_names.split(",")
-        elif bands[i] == "dualband" or bands[i] == "DUALBAND":
-            args.bands = bands[i]
-            args.mode = 0
-            if args.create_sta:
-                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0, end_id_=(int(args.num_stations_2g)) - 1,
-                                                      padding_number_=10000,
-                                                      radio=args.radio_2g)
-                station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g),
-                                                           end_id_=((int(args.num_stations_2g)) + (int(args.num_stations_5g))) - 1,
-                                                           padding_number_=10000,
-                                                           radio=args.radio_5g))
-        elif bands[i] == "triband" or bands[i] == "TRIBAND":
-            args.bands = bands[i]
-            args.mode = 0
-            if args.create_sta:
-                # 2.4GHz stations
-                station_list = LFUtils.portNameSeries(prefix_="sta", start_id_=0,
-                                                      end_id_=int(args.num_stations_2g) - 1,
-                                                      padding_number_=10000,
-                                                      radio=args.radio_2g)
+                print("Band " + bands[i] + " Not Exist")
+                exit(1)
+            # ---------------------------------------#
+            for index in range(len(loads["download"])):
+                throughput_qos = ThroughputQOS(host=args.mgr,
+                                            port=args.mgr_port,
+                                            number_template="0000",
+                                            ap_name=args.ap_name,
+                                            num_stations_2g=int(args.num_stations_2g),
+                                            num_stations_5g=int(args.num_stations_5g),
+                                            num_stations_6g=int(args.num_stations_6g),
+                                            sta_list=station_list,
+                                            create_sta=args.create_sta,
+                                            name_prefix="TOS-",
+                                            upstream=args.upstream_port,
+                                            ssid=args.ssid,
+                                            password=args.passwd,
+                                            security=args.security,
+                                            ssid_2g=args.ssid_2g,
+                                            password_2g=args.passwd_2g,
+                                            security_2g=args.security_2g,
+                                            ssid_5g=args.ssid_5g,
+                                            password_5g=args.passwd_5g,
+                                            security_5g=args.security_5g,
+                                            ssid_6g=args.ssid_6g,
+                                            password_6g=args.passwd_6g,
+                                            security_6g=args.security_6g,
+                                            radio_2g=args.radio_2g,
+                                            radio_5g=args.radio_5g,
+                                            radio_6g=args.radio_6g,
+                                            test_duration=args.test_duration,
+                                            use_ht160=False,
+                                            side_a_min_rate=int(loads['upload'][index]),
+                                            side_b_min_rate=int(loads['download'][index]),
+                                            mode=args.mode,
+                                            bands=args.bands,
+                                            traffic_type=args.traffic_type,
+                                            tos=args.tos,
+                                            test_case=args.test_case,
+                                            initial_band_pref=args.initial_band_pref,
+                                            _debug_on=args.debug
+                                            )
+                throughput_qos.pre_cleanup()
+                throughput_qos.build()
 
-                # 5GHz stations
-                station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g),
-                                                           end_id_=int(args.num_stations_2g) + int(args.num_stations_5g) - 1,
-                                                           padding_number_=10000,
-                                                           radio=args.radio_5g))
+                # if args.create_sta:
+                #     if not throughput_qos.passes():
+                #         print(throughput_qos.get_fail_message())
+                #         throughput_qos.exit_fail()
 
-                # 6GHz stations (Fixed to use `radio_6g`)
-                station_list.extend(LFUtils.portNameSeries(prefix_="sta", start_id_=int(args.num_stations_2g) + int(args.num_stations_5g),
-                                                           end_id_=int(args.num_stations_2g) + int(args.num_stations_5g) + int(args.num_stations_6g) - 1,
-                                                           padding_number_=10000,
-                                                           radio=args.radio_6g))
-
-                print(station_list)
-
-            else:
-                station_list = args.sta_names.split(",")
-        else:
-            print("Band " + bands[i] + " Not Exist")
-            exit(1)
-        # ---------------------------------------#
-        for index in range(len(loads["download"])):
-            throughput_qos = ThroughputQOS(host=args.mgr,
-                                           port=args.mgr_port,
-                                           number_template="0000",
-                                           ap_name=args.ap_name,
-                                           num_stations_2g=int(args.num_stations_2g),
-                                           num_stations_5g=int(args.num_stations_5g),
-                                           num_stations_6g=int(args.num_stations_6g),
-                                           sta_list=station_list,
-                                           create_sta=args.create_sta,
-                                           name_prefix="TOS-",
-                                           upstream=args.upstream_port,
-                                           ssid=args.ssid,
-                                           password=args.passwd,
-                                           security=args.security,
-                                           ssid_2g=args.ssid_2g,
-                                           password_2g=args.passwd_2g,
-                                           security_2g=args.security_2g,
-                                           ssid_5g=args.ssid_5g,
-                                           password_5g=args.passwd_5g,
-                                           security_5g=args.security_5g,
-                                           ssid_6g=args.ssid_6g,
-                                           password_6g=args.passwd_6g,
-                                           security_6g=args.security_6g,
-                                           radio_2g=args.radio_2g,
-                                           radio_5g=args.radio_5g,
-                                           radio_6g=args.radio_6g,
-                                           test_duration=args.test_duration,
-                                           use_ht160=False,
-                                           side_a_min_rate=int(loads['upload'][index]),
-                                           side_b_min_rate=int(loads['download'][index]),
-                                           mode=args.mode,
-                                           bands=args.bands,
-                                           traffic_type=args.traffic_type,
-                                           tos=args.tos,
-                                           test_case=args.test_case,
-                                           initial_band_pref=args.initial_band_pref,
-                                           _debug_on=args.debug
-                                           )
-            throughput_qos.pre_cleanup()
-            throughput_qos.build()
-
-            # if args.create_sta:
-            #     if not throughput_qos.passes():
-            #         print(throughput_qos.get_fail_message())
-            #         throughput_qos.exit_fail()
-
-            throughput_qos.start(False, False)
-            time.sleep(10)
-            connections_download, connections_upload, drop_a_per, drop_b_per = throughput_qos.monitor()
-            print("connections download", connections_download)
-            print("connections upload", connections_upload)
-            throughput_qos.stop()
-            time.sleep(5)
-            test_results['test_results'].append(throughput_qos.evaluate_qos(connections_download, connections_upload, drop_a_per, drop_b_per))
-            data.update({bands[i]: test_results})
-            input_setup_info = {
-                "contact": "support@candelatech.com"
-            }
-            throughput_qos.generate_report(data=data, input_setup_info=input_setup_info)
-            if args.create_sta:
-                if not throughput_qos.passes():
-                    print(throughput_qos.get_fail_message())
-                    throughput_qos.exit_fail()
-                # LFUtils.wait_until_ports_admin_up(port_list=station_list)
-                if throughput_qos.passes():
-                    throughput_qos.success()
-                throughput_qos.cleanup()
+                throughput_qos.start(False, False)
+                time.sleep(10)
+                connections_download, connections_upload, drop_a_per, drop_b_per = throughput_qos.monitor()
+                print("connections download", connections_download)
+                print("connections upload", connections_upload)
+                throughput_qos.stop()
+                time.sleep(5)
+                test_results['test_results'].append(throughput_qos.evaluate_qos(connections_download, connections_upload, drop_a_per, drop_b_per))
+                data.update({bands[i]: test_results})
+                input_setup_info = {
+                    "contact": "support@candelatech.com"
+                }
+                throughput_qos.generate_report(data=data, input_setup_info=input_setup_info)
+                if args.create_sta:
+                    if not throughput_qos.passes():
+                        print(throughput_qos.get_fail_message())
+                        throughput_qos.exit_fail()
+                    # LFUtils.wait_until_ports_admin_up(port_list=station_list)
+                    if throughput_qos.passes():
+                        throughput_qos.success()
+                    throughput_qos.cleanup()
 
     test_end_time = datetime.now().strftime("%b %d %H:%M:%S")
     print("Test ended at: ", test_end_time)

@@ -169,3 +169,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+# Secrets and sensitive data
+.env
+.env.local
+config/secrets.*
+*.key
+*.pem
+credentials.json
+api_keys.txt

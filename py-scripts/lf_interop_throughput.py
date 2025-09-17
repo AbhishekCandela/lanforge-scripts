@@ -230,6 +230,7 @@ class Throughput(Realm):
                  pac_file=None,
                  wait_time=60,
                  config=False,
+                 orientation=None,
                  user_list=None, real_client_list=None, real_client_list1=None, hw_list=None, laptop_list=None, android_list=None, mac_list=None, windows_list=None, linux_list=None,
                  total_resources_list=None, working_resources_list=None, hostname_list=None, username_list=None, eid_list=None,
                  devices_available=None, input_devices_list=None, mac_id1_list=None, mac_id_list=None, overall_avg_rssi=None):
@@ -333,6 +334,7 @@ class Throughput(Realm):
         self.pac_file = pac_file
         self.wait_time = wait_time
         self.config = config
+        self.orientation = orientation
         self.configdevices = {}
         self.group_device_map = {}
 
@@ -2228,6 +2230,8 @@ class Throughput(Realm):
                 report.set_custom_html('<hr>')
                 report.build_custom()
 
+        elif self.orientation:
+            pass
         # report.build_custom()
         report.build_footer()
         report.write_html()
@@ -2683,7 +2687,7 @@ Copyright 2023 Candela Technologies Inc.
     required.add_argument('--traffic_type', help='Select the Traffic Type [lf_udp, lf_tcp]', required=False)
     required.add_argument('--upload', help='--upload traffic load per connection (upload rate)', default='2560')
     required.add_argument('--download', help='--download traffic load per connection (download rate)', default='2560')
-    required.add_argument('--test_duration', help='--test_duration sets the duration of the test', default="")
+    required.add_argument('--test_duration', help='--test_duration sets the duration of the test', type=str, default="")
     required.add_argument('--report_timer', help='--duration to collect data', default="5s")
     required.add_argument('--ap_name', help="AP Model Name", default="Test-AP")
     required.add_argument('--dowebgui', help="If true will execute script for webgui", action='store_true')
@@ -2727,6 +2731,7 @@ Copyright 2023 Candela Technologies Inc.
     optional.add_argument('--profile_name', type=str, help='Specify the profile name to apply configurations to the devices.')
     optional.add_argument("--wait_time", type=int, help='Specify the maximum time to wait for Configuration', default=60)
     optional.add_argument("--config", action="store_true", help="Specify for configuring the devices")
+    optional.add_argument("--orientation", default=None, help="Specify the Orientation")
     parser.add_argument('--help_summary', help='Show summary of what this script does', action="store_true")
 
     args = parser.parse_args()
@@ -2807,145 +2812,287 @@ Copyright 2023 Candela Technologies Inc.
         logger.error("Packet size should be greater than 16 bytes and less than 65507 bytes incorrect")
         return
 
-    for index in range(len(loads_data)):
-        throughput = Throughput(host=args.mgr,
-                                ip=args.mgr,
-                                port=args.mgr_port,
-                                number_template="0000",
-                                ap_name=args.ap_name,
-                                name_prefix="TOS-",
-                                upstream=args.upstream_port,
-                                ssid=args.ssid,
-                                password=args.passwd,
-                                security=args.security,
-                                test_duration=args.test_duration,
-                                use_ht160=False,
-                                side_a_min_rate=int(loads['upload'][index]),
-                                side_b_min_rate=int(loads['download'][index]),
-                                side_a_min_pdu=int(args.packet_size),
-                                side_b_min_pdu=int(args.packet_size),
-                                traffic_type=args.traffic_type,
-                                tos=args.tos,
-                                dowebgui=args.dowebgui,
-                                test_name=args.test_name,
-                                result_dir=args.result_dir,
-                                device_list=args.device_list,
-                                incremental_capacity=args.incremental_capacity,
-                                report_timer=args.report_timer,
-                                load_type=args.load_type,
-                                do_interopability=args.do_interopability,
-                                incremental=args.incremental,
-                                precleanup=args.precleanup,
-                                csv_direction=csv_direction,
-                                expected_passfail_value=args.expected_passfail_value,
-                                device_csv_name=args.device_csv_name,
-                                file_name=args.file_name,
-                                group_name=args.group_name,
-                                profile_name=args.profile_name,
-                                eap_method=args.eap_method,
-                                eap_identity=args.eap_identity,
-                                ieee80211=args.ieee8021x,
-                                ieee80211u=args.ieee80211u,
-                                ieee80211w=args.ieee80211w,
-                                enable_pkc=args.enable_pkc,
-                                bss_transition=args.bss_transition,
-                                power_save=args.power_save,
-                                disable_ofdma=args.disable_ofdma,
-                                roam_ft_ds=args.roam_ft_ds,
-                                key_management=args.key_management,
-                                pairwise=args.pairwise,
-                                private_key=args.private_key,
-                                ca_cert=args.ca_cert,
-                                client_cert=args.client_cert,
-                                pk_passwd=args.pk_passwd,
-                                pac_file=args.pac_file,
-                                wait_time=args.wait_time,
-                                config=args.config
-                                )
+    print('debug :',args.orientation, type(args.orientation))
 
-        if gave_incremental:
-            throughput.gave_incremental = True
-        throughput.os_type()
+    if args.orientation is not None:
+        for angle in args.orientation:
+            for index in range(len(loads_data)):
+                throughput = Throughput(host=args.mgr,
+                                        ip=args.mgr,
+                                        port=args.mgr_port,
+                                        number_template="0000",
+                                        ap_name=args.ap_name,
+                                        name_prefix="TOS-",
+                                        upstream=args.upstream_port,
+                                        ssid=args.ssid,
+                                        password=args.passwd,
+                                        security=args.security,
+                                        test_duration=args.test_duration,
+                                        use_ht160=False,
+                                        side_a_min_rate=int(loads['upload'][index]),
+                                        side_b_min_rate=int(loads['download'][index]),
+                                        side_a_min_pdu=int(args.packet_size),
+                                        side_b_min_pdu=int(args.packet_size),
+                                        traffic_type=args.traffic_type,
+                                        tos=args.tos,
+                                        dowebgui=args.dowebgui,
+                                        test_name=args.test_name,
+                                        result_dir=args.result_dir,
+                                        device_list=args.device_list,
+                                        incremental_capacity=args.incremental_capacity,
+                                        report_timer=args.report_timer,
+                                        load_type=args.load_type,
+                                        do_interopability=args.do_interopability,
+                                        incremental=args.incremental,
+                                        precleanup=args.precleanup,
+                                        csv_direction=csv_direction,
+                                        expected_passfail_value=args.expected_passfail_value,
+                                        device_csv_name=args.device_csv_name,
+                                        file_name=args.file_name,
+                                        group_name=args.group_name,
+                                        profile_name=args.profile_name,
+                                        eap_method=args.eap_method,
+                                        eap_identity=args.eap_identity,
+                                        ieee80211=args.ieee8021x,
+                                        ieee80211u=args.ieee80211u,
+                                        ieee80211w=args.ieee80211w,
+                                        enable_pkc=args.enable_pkc,
+                                        bss_transition=args.bss_transition,
+                                        power_save=args.power_save,
+                                        disable_ofdma=args.disable_ofdma,
+                                        roam_ft_ds=args.roam_ft_ds,
+                                        key_management=args.key_management,
+                                        pairwise=args.pairwise,
+                                        private_key=args.private_key,
+                                        ca_cert=args.ca_cert,
+                                        client_cert=args.client_cert,
+                                        pk_passwd=args.pk_passwd,
+                                        pac_file=args.pac_file,
+                                        wait_time=args.wait_time,
+                                        config=args.config,
+                                        orientation=angle
+                                        )
 
-        check_condition, clients_to_run = throughput.phantom_check()
+                if gave_incremental:
+                    throughput.gave_incremental = True
+                throughput.os_type()
 
-        if check_condition == False:
-            return
+                check_condition, clients_to_run = throughput.phantom_check()
 
-        check_increment_condition = throughput.check_incremental_list()
+                if check_condition == False:
+                    return
 
-        if check_increment_condition == False:
-            logger.error("Incremental values given for selected devices are incorrect")
-            return
+                check_increment_condition = throughput.check_incremental_list()
 
-        elif (len(args.incremental_capacity) > 0 and check_increment_condition == False):
-            logger.error("Incremental values given for selected devices are incorrect")
-            return
+                if check_increment_condition == False:
+                    logger.error("Incremental values given for selected devices are incorrect")
+                    return
 
-        created_cxs = throughput.build()
-        time.sleep(10)
-        created_cxs = list(created_cxs.keys())
-        individual_dataframe_column = []
+                elif (len(args.incremental_capacity) > 0 and check_increment_condition == False):
+                    logger.error("Incremental values given for selected devices are incorrect")
+                    return
 
-        to_run_cxs, to_run_cxs_len, created_cx_lists_keys, incremental_capacity_list = throughput.get_incremental_capacity_list()
+                created_cxs = throughput.build()
+                time.sleep(10)
+                created_cxs = list(created_cxs.keys())
+                individual_dataframe_column = []
 
-        for i in range(len(clients_to_run)):
+                to_run_cxs, to_run_cxs_len, created_cx_lists_keys, incremental_capacity_list = throughput.get_incremental_capacity_list()
 
-            # Extend individual_dataframe_column with dynamically generated column names
-            individual_dataframe_column.extend([f'Download{clients_to_run[i]}', f'Upload{clients_to_run[i]}', f'Rx % Drop A {clients_to_run[i]}',
-                                               f'Rx % Drop B{clients_to_run[i]}', f'RSSI {clients_to_run[i]} ', f'Tx-Rate {clients_to_run[i]} ', f'Rx-Rate {clients_to_run[i]} '])
+                for i in range(len(clients_to_run)):
 
-        individual_dataframe_column.extend(['Overall Download', 'Overall Upload', 'Overall Rx % Drop A', 'Overall Rx % Drop B', 'Iteration',
-                                           'TIMESTAMP', 'Start_time', 'End_time', 'Remaining_Time', 'Incremental_list', 'status'])
-        individual_df = pd.DataFrame(columns=individual_dataframe_column)
+                    # Extend individual_dataframe_column with dynamically generated column names
+                    individual_dataframe_column.extend([f'Download{clients_to_run[i]}', f'Upload{clients_to_run[i]}', f'Rx % Drop A {clients_to_run[i]}',
+                                                    f'Rx % Drop B{clients_to_run[i]}', f'RSSI {clients_to_run[i]} ', f'Tx-Rate {clients_to_run[i]} ', f'Rx-Rate {clients_to_run[i]} '])
 
-        overall_start_time = datetime.now()
-        overall_end_time = overall_start_time + timedelta(seconds=int(args.test_duration) * len(incremental_capacity_list))
+                individual_dataframe_column.extend(['Overall Download', 'Overall Upload', 'Overall Rx % Drop A', 'Overall Rx % Drop B', 'Iteration',
+                                                'TIMESTAMP', 'Start_time', 'End_time', 'Remaining_Time', 'Incremental_list', 'status'])
+                individual_df = pd.DataFrame(columns=individual_dataframe_column)
 
-        for i in range(len(to_run_cxs)):
-            # Check the load type specified by the user
-            if args.load_type == "wc_intended_load":
-                # Perform intended load for the current iteration
-                throughput.perform_intended_load(i, incremental_capacity_list)
-                if i != 0:
+                overall_start_time = datetime.now()
+                overall_end_time = overall_start_time + timedelta(seconds=int(args.test_duration) * len(incremental_capacity_list))
 
-                    # Stop throughput testing if not the first iteration
-                    throughput.stop()
+                for i in range(len(to_run_cxs)):
+                    # Check the load type specified by the user
+                    if args.load_type == "wc_intended_load":
+                        # Perform intended load for the current iteration
+                        throughput.perform_intended_load(i, incremental_capacity_list)
+                        if i != 0:
 
-                # Start specific connections for the current iteration
-                throughput.start_specific(created_cx_lists_keys[:incremental_capacity_list[i]])
-            else:
-                if (args.do_interopability and i != 0):
-                    throughput.stop_specific(to_run_cxs[i - 1])
-                    time.sleep(5)
-                throughput.start_specific(to_run_cxs[i])
+                            # Stop throughput testing if not the first iteration
+                            throughput.stop()
 
-            # Determine device names based on the current iteration
-            device_names = created_cx_lists_keys[:to_run_cxs_len[i][-1]]
+                        # Start specific connections for the current iteration
+                        throughput.start_specific(created_cx_lists_keys[:incremental_capacity_list[i]])
+                    else:
+                        if (args.do_interopability and i != 0):
+                            throughput.stop_specific(to_run_cxs[i - 1])
+                            time.sleep(5)
+                        throughput.start_specific(to_run_cxs[i])
 
-            # Monitor throughput and capture all dataframes and test stop status
-            all_dataframes, test_stopped_by_user = throughput.monitor(i, individual_df, device_names, incremental_capacity_list, overall_start_time, overall_end_time)
+                    # Determine device names based on the current iteration
+                    device_names = created_cx_lists_keys[:to_run_cxs_len[i][-1]]
 
-            # Check if the test was stopped by the user
-            if test_stopped_by_user == False:
+                    # Monitor throughput and capture all dataframes and test stop status
+                    all_dataframes, test_stopped_by_user = throughput.monitor(i, individual_df, device_names, incremental_capacity_list, overall_start_time, overall_end_time)
 
-                # Append current iteration index to iterations_before_test_stopped_by_user
-                iterations_before_test_stopped_by_user.append(i)
-            else:
+                    # Check if the test was stopped by the user
+                    if test_stopped_by_user == False:
+                        # Append current iteration index to iterations_before_test_stopped_by_user
+                        iterations_before_test_stopped_by_user.append(i)
+                    else:
+                        # Append current iteration index to iterations_before_test_stopped_by_user
+                        iterations_before_test_stopped_by_user.append(i)
+                        break
 
-                # Append current iteration index to iterations_before_test_stopped_by_user
-                iterations_before_test_stopped_by_user.append(i)
-                break
+        throughput.stop()
+        if args.postcleanup:
+            throughput.cleanup()
+        throughput.generate_report(list(set(iterations_before_test_stopped_by_user)), incremental_capacity_list, data=all_dataframes, data1=to_run_cxs_len, report_path=throughput.result_dir)
+        if throughput.dowebgui:
+            # copying to home directory i.e home/user_name
+            throughput.copy_reports_to_home_dir()
 
-    #     logger.info("connections download {}".format(connections_download))
-    #     logger.info("connections upload {}".format(connections_upload))
-    throughput.stop()
-    if args.postcleanup:
-        throughput.cleanup()
-    throughput.generate_report(list(set(iterations_before_test_stopped_by_user)), incremental_capacity_list, data=all_dataframes, data1=to_run_cxs_len, report_path=throughput.result_dir)
-    if throughput.dowebgui:
-        # copying to home directory i.e home/user_name
-        throughput.copy_reports_to_home_dir()
+    else:
+        for index in range(len(loads_data)):
+            throughput = Throughput(host=args.mgr,
+                                    ip=args.mgr,
+                                    port=args.mgr_port,
+                                    number_template="0000",
+                                    ap_name=args.ap_name,
+                                    name_prefix="TOS-",
+                                    upstream=args.upstream_port,
+                                    ssid=args.ssid,
+                                    password=args.passwd,
+                                    security=args.security,
+                                    test_duration=args.test_duration,
+                                    use_ht160=False,
+                                    side_a_min_rate=int(loads['upload'][index]),
+                                    side_b_min_rate=int(loads['download'][index]),
+                                    side_a_min_pdu=int(args.packet_size),
+                                    side_b_min_pdu=int(args.packet_size),
+                                    traffic_type=args.traffic_type,
+                                    tos=args.tos,
+                                    dowebgui=args.dowebgui,
+                                    test_name=args.test_name,
+                                    result_dir=args.result_dir,
+                                    device_list=args.device_list,
+                                    incremental_capacity=args.incremental_capacity,
+                                    report_timer=args.report_timer,
+                                    load_type=args.load_type,
+                                    do_interopability=args.do_interopability,
+                                    incremental=args.incremental,
+                                    precleanup=args.precleanup,
+                                    csv_direction=csv_direction,
+                                    expected_passfail_value=args.expected_passfail_value,
+                                    device_csv_name=args.device_csv_name,
+                                    file_name=args.file_name,
+                                    group_name=args.group_name,
+                                    profile_name=args.profile_name,
+                                    eap_method=args.eap_method,
+                                    eap_identity=args.eap_identity,
+                                    ieee80211=args.ieee8021x,
+                                    ieee80211u=args.ieee80211u,
+                                    ieee80211w=args.ieee80211w,
+                                    enable_pkc=args.enable_pkc,
+                                    bss_transition=args.bss_transition,
+                                    power_save=args.power_save,
+                                    disable_ofdma=args.disable_ofdma,
+                                    roam_ft_ds=args.roam_ft_ds,
+                                    key_management=args.key_management,
+                                    pairwise=args.pairwise,
+                                    private_key=args.private_key,
+                                    ca_cert=args.ca_cert,
+                                    client_cert=args.client_cert,
+                                    pk_passwd=args.pk_passwd,
+                                    pac_file=args.pac_file,
+                                    wait_time=args.wait_time,
+                                    config=args.config
+                                    )
+
+            if gave_incremental:
+                throughput.gave_incremental = True
+            throughput.os_type()
+
+            check_condition, clients_to_run = throughput.phantom_check()
+
+            if check_condition == False:
+                return
+
+            check_increment_condition = throughput.check_incremental_list()
+
+            if check_increment_condition == False:
+                logger.error("Incremental values given for selected devices are incorrect")
+                return
+
+            elif (len(args.incremental_capacity) > 0 and check_increment_condition == False):
+                logger.error("Incremental values given for selected devices are incorrect")
+                return
+
+            created_cxs = throughput.build()
+            time.sleep(10)
+            created_cxs = list(created_cxs.keys())
+            individual_dataframe_column = []
+
+            to_run_cxs, to_run_cxs_len, created_cx_lists_keys, incremental_capacity_list = throughput.get_incremental_capacity_list()
+
+            for i in range(len(clients_to_run)):
+
+                # Extend individual_dataframe_column with dynamically generated column names
+                individual_dataframe_column.extend([f'Download{clients_to_run[i]}', f'Upload{clients_to_run[i]}', f'Rx % Drop A {clients_to_run[i]}',
+                                                f'Rx % Drop B{clients_to_run[i]}', f'RSSI {clients_to_run[i]} ', f'Tx-Rate {clients_to_run[i]} ', f'Rx-Rate {clients_to_run[i]} '])
+
+            individual_dataframe_column.extend(['Overall Download', 'Overall Upload', 'Overall Rx % Drop A', 'Overall Rx % Drop B', 'Iteration',
+                                            'TIMESTAMP', 'Start_time', 'End_time', 'Remaining_Time', 'Incremental_list', 'status'])
+            individual_df = pd.DataFrame(columns=individual_dataframe_column)
+
+            overall_start_time = datetime.now()
+            overall_end_time = overall_start_time + timedelta(seconds=int(args.test_duration) * len(incremental_capacity_list))
+
+            for i in range(len(to_run_cxs)):
+                # Check the load type specified by the user
+                if args.load_type == "wc_intended_load":
+                    # Perform intended load for the current iteration
+                    throughput.perform_intended_load(i, incremental_capacity_list)
+                    if i != 0:
+
+                        # Stop throughput testing if not the first iteration
+                        throughput.stop()
+
+                    # Start specific connections for the current iteration
+                    throughput.start_specific(created_cx_lists_keys[:incremental_capacity_list[i]])
+                else:
+                    if (args.do_interopability and i != 0):
+                        throughput.stop_specific(to_run_cxs[i - 1])
+                        time.sleep(5)
+                    throughput.start_specific(to_run_cxs[i])
+
+                # Determine device names based on the current iteration
+                device_names = created_cx_lists_keys[:to_run_cxs_len[i][-1]]
+
+                # Monitor throughput and capture all dataframes and test stop status
+                all_dataframes, test_stopped_by_user = throughput.monitor(i, individual_df, device_names, incremental_capacity_list, overall_start_time, overall_end_time)
+
+                # Check if the test was stopped by the user
+                if test_stopped_by_user == False:
+
+                    # Append current iteration index to iterations_before_test_stopped_by_user
+                    iterations_before_test_stopped_by_user.append(i)
+                else:
+
+                    # Append current iteration index to iterations_before_test_stopped_by_user
+                    iterations_before_test_stopped_by_user.append(i)
+                    break
+
+        #     logger.info("connections download {}".format(connections_download))
+        #     logger.info("connections upload {}".format(connections_upload))
+        throughput.stop()
+        if args.postcleanup:
+            throughput.cleanup()
+        throughput.generate_report(list(set(iterations_before_test_stopped_by_user)), incremental_capacity_list, data=all_dataframes, data1=to_run_cxs_len, report_path=throughput.result_dir)
+        if throughput.dowebgui:
+            # copying to home directory i.e home/user_name
+            throughput.copy_reports_to_home_dir()
 
 
 if __name__ == "__main__":

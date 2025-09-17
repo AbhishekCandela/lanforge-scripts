@@ -107,7 +107,8 @@ import argparse
 import time
 import json
 import logging
-
+import pandas as pd
+from tabulate import tabulate
 
 if sys.version_info[0] != 3:
     print("This script requires Python 3")
@@ -438,6 +439,51 @@ class DataplaneTest(cv_test):
         self.rm_text_blob(config_name=self.config_name,
                           blob_test_name=blob_test)
 
+        # Path to the CSV file
+        response_str = self.report_name[0]["LAST"]["response"]
+        report_path = response_str.split(":::")[-1]
+
+        # TODO hardcoded loop-1 need to implement for general case
+        csv_path = report_path +"/csv-data/data-Throughput_vs_Loops-1.csv"
+
+        try:
+            df = pd.read_csv(csv_path, header=1)
+            print("csv data", df)
+        except FileNotFoundError:
+            print(f"Error: File not found at {csv_path}")
+            exit(1)
+
+        processed_data = []
+        for _, row in df.iterrows():
+            series_name = row['series_name']
+            throughput = row['loop-1']
+
+            if 'UDP' in series_name:
+                protocol = 'UDP'
+            elif 'TCP' in series_name:
+                protocol = 'TCP'
+
+            if 'TX' in series_name:
+                direction = 'Download'
+            elif 'RX' in series_name:
+                direction = 'Upload'
+
+            processed_data.append({
+                'traffic type': protocol,
+                'direction': direction,
+                'loop': throughput
+            })
+
+        result_df = pd.DataFrame(processed_data)
+
+        table_data = []
+        for _, row in result_df.iterrows():
+            table_data.append([f"{row['traffic type']}-{row['direction']}", row['loop']])
+
+        # Print as table
+        print("\nThroughput vs Packet size\n")
+        print(tabulate(table_data, headers=["Traffic type - Direction", "Throughput (Mbps)"], tablefmt="grid"))
+        print("\n")
 
 def parse_args():
     """Parse test script arguments."""
@@ -973,8 +1019,10 @@ def main():
 
     if CV_Test.passes():
         CV_Test.exit_success()
+        print('Test passed successfully')
     else:
         CV_Test.exit_fail()
+        print('Test failed')
 
 
 if __name__ == "__main__":

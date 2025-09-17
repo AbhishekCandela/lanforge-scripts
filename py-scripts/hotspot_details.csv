@@ -1,0 +1,5 @@
+Resource_Id,Device_serial,Device_name,Hotspot_Name,Hotspot_Password,Security_Type,Max_Clients_Supported
+1.11,1.1.08301JEC207624,Pixel4a,Pixel_9965,lanforge,wpa2,8
+1.18,1.1.13301JEC205162,pixel,Pixel_5650,lanforge,wpa2,8
+1.10,openwifi,OpenWifi,OpenWifi_psk2,OpenWifi,wpa2,6
+1.12,ZZZZZZ,YYYYYY,OpenWifi_psk2,OpenWifi,wpa2,8
