@@ -452,6 +452,13 @@ class SpeedTest(Realm):
                     'device_type': info.get('device-type', 'Android')
                 }
 
+        def merge_preferring_non_empty(dst: dict, src: dict) -> dict:
+            for k, v in (src or {}).items():
+                if v not in (None, ''):
+                    if dst.get(k) in (None, ''):
+                        dst[k] = v
+            return dst
+
         devices_data = {}
 
         # From /ports/all: capture WLAN ports only, skip phantom/down
@@ -459,7 +466,6 @@ class SpeedTest(Realm):
             port_id = next(iter(pd))
             pdata = pd[port_id]
 
-            # resource id like "1.11" from "1.11.wlan0"
             parts = port_id.split('.')
             if len(parts) < 3:
                 continue
@@ -471,11 +477,9 @@ class SpeedTest(Realm):
             try:
                 if pdata.get('phantom', True) or pdata.get('down', True):
                     continue
-                # keep only real client radios (adjust if you support more)
                 if pdata.get('parent dev') != 'wiphy0':
                     continue
             except Exception:
-                # best effort: if structure is odd, skip it
                 continue
 
             res = resource_data[resource]
@@ -501,7 +505,7 @@ class SpeedTest(Realm):
             if ctrl_ip and box_hostname:
                 self.ip_hostname[ctrl_ip] = box_hostname
 
-        # ---- From /adb/all: add/augment Android rows using serial key
+        # ---- From /adb/all: move Android rows to a single row keyed by SERIAL
         for rid in resource_ids:
             res = resource_data[rid]
             if (res.get('device type') or '').lower() != 'android':
@@ -510,90 +514,37 @@ class SpeedTest(Realm):
             ctrl_ip = res.get('ctrl-ip')
             adb = adb_by_resource.get(rid)
             if not adb:
-                continue  # no ADB info for this resource
+                continue
 
-            serial_key = f"{adb.get('shelf_resource')}.wlan0"
-            # seed or update a dedicated Android row keyed by serial-key
-            row = devices_data.get(serial_key, {})
-            row.update({
+            serial_key = adb.get('serial').split('.')[-1]  # e.g. R9ZW9098RMZ
+            port_key = f"{rid}.wlan0"                      # e.g. 1.11.wlan0
+
+            wlan_row = devices_data.pop(port_key, {})  # <— deletes 1.xx.wlan0 if present
+
+            # Start the serial row with sane defaults
+            serial_row = {
                 'device type': 'Android',
-                'ip': ctrl_ip,
+                'cmd': None,
+                'ip': ctrl_ip or wlan_row.get('ip'),
                 'port': adb.get('shelf_resource'),
-                'serial': (adb.get('serial') or '').split('.')[-1],
-                'hostname': adb.get('user_name') or res.get('hostname') or res.get('user'),
-                # keep existing ssid/channel if already present
-                'ssid': row.get('ssid'),
-                'channel': row.get('channel'),
-                # prefer adb wifi mac if present
-                'mac': adb.get('wifi_mac') or row.get('mac')
-            })
-            devices_data[serial_key] = row
+                'serial': serial_key,
+                'hostname': adb.get('user_name') or res.get('hostname') or wlan_row.get('hostname') or res.get('user'),
+                'ssid': wlan_row.get('ssid'),
+                'channel': wlan_row.get('channel'),
+                'mac': adb.get('wifi_mac') or wlan_row.get('mac'),
+            }
 
-            # Prefer the friendlier hostname for reporting
+            # If we had already created a serial row, merge non-empty fields into it
+            if serial_key in devices_data:
+                serial_row = merge_preferring_non_empty(devices_data[serial_key], serial_row)
+
+            devices_data[serial_key] = serial_row
+
+            # Prefer hostname for reporting
             if ctrl_ip and adb.get('user_name'):
                 self.ip_hostname[ctrl_ip] = adb['user_name']
 
-        # ---- Consolidate by (ip, mac): produce union of all fields under a canonical key
-        from collections import defaultdict
-
-        def is_preferred_key(k: str, info: dict) -> tuple:
-            """
-            Higher tuple wins in max(). Preference order:
-            1) looks like '<d>.<d>.wlan0'
-            2) has 'port' field (i.e., serial-key style)
-            3) contains 'wlan'
-            4) longer key (as a weak tie-breaker)
-            """
-            parts = k.split('.')
-            looks_serial = int(parts[0]) if parts and parts[0].isdigit() else None
-            looks_port = (len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit() and parts[2] == 'wlan0')
-            return (
-                1 if looks_port else 0,
-                1 if info.get('port') else 0,
-                1 if 'wlan' in k else 0,
-                len(k)
-            )
-
-        groups = defaultdict(list)
-        for key, info in devices_data.items():
-            ip = info.get('ip')
-            mac = info.get('mac')
-            if not ip or not mac:
-                # If either missing, keep as its own "group" by unique key to avoid losing it
-                groups[(key, None)].append((key, info))
-            else:
-                groups[(ip, mac)].append((key, info))
-
-        final_devices = {}
-
-        def merge_into(dst: dict, src: dict):
-            # copy any non-empty field from src into dst if dst is empty/None
-            for k, v in src.items():
-                if v not in (None, ''):
-                    if dst.get(k) in (None, ''):
-                        dst[k] = v
-            return dst
-
-        for grp_key, entries in groups.items():
-            # pick canonical key
-            canonical_key, _ = max(entries, key=lambda kv: is_preferred_key(kv[0], kv[1]))
-            merged = {}
-            # merge all entries into merged (favor first non-empty)
-            for _, info in entries:
-                merged = merge_into(merged, info)
-
-            # ensure some consistent fields exist even if missing
-            merged.setdefault('device type', 'Android')
-            merged.setdefault('ssid', merged.get('ssid'))
-            merged.setdefault('channel', merged.get('channel'))
-            merged.setdefault('cmd', merged.get('cmd'))
-
-            final_devices[canonical_key] = merged
-
-        # Save back
-        self.devices_data = final_devices
-
-        # Optional: debug
+        self.devices_data = devices_data
         print(self.devices_data)
 
     def filter_devices(self, resources_list):
@@ -790,7 +741,7 @@ class SpeedTest(Realm):
 
 
     def create_android(self, ports=None, sleep_time=.5, debug_=False, suppress_related_commands_=None, real_client_os_types=None):
-        
+
         if ports and real_client_os_types and len(real_client_os_types) == 0:
             logging.error('Real client operating systems types is empty list')
             raise ValueError('Real client operating systems types is empty list')
@@ -1569,7 +1520,7 @@ class SpeedTest(Realm):
             )
 
             # --- Per-iteration graphs and tables, with NA backfill ---
-            missing_notes_all = []  # collect messages about not-reported devices
+            missing_notes_all = []
 
             for iter_idx in range(1, self.iteration + 1):
                 print('Iteration DATA:', self.iteration_dict)
@@ -1577,7 +1528,6 @@ class SpeedTest(Realm):
                 # Wait until we have m rows or timing out
                 wait_for_iteration_posts(iter_idx, expected=device_count)
 
-                # Pull what we have (may be fewer than m)
                 iter_block = self.iteration_dict.get(iter_idx, {
                     'ip': [], 'hostname': [], 'download_speed': [], 'upload_speed': [], 'download_lat': [], 'upload_lat': []
                 })
@@ -1585,18 +1535,17 @@ class SpeedTest(Realm):
                 # Map from IP -> index in lists (iteration_dict keeps parallel arrays)
                 ip_to_idx = {ip: i for i, ip in enumerate(iter_block.get('ip', []))}
 
-                # Build aligned arrays exactly of length m in roster order
                 hostnames = []
                 dls = []
                 uls = []
                 dlat = []
                 ulat = []
 
-                # also build device table fields (aligned)
                 t_hostname = []
                 t_mac = []
                 t_ssid = []
                 t_channel = []
+                t_type = []
 
                 for dev in roster:
                     ip = dev["ip"]
@@ -1605,6 +1554,7 @@ class SpeedTest(Realm):
                     t_mac.append(dev["mac"])
                     t_ssid.append(dev["ssid"])
                     t_channel.append(dev["channel"])
+                    t_type.append(dev["device_type"])
 
                     if ip in ip_to_idx:
                         j = ip_to_idx[ip]
@@ -1614,7 +1564,6 @@ class SpeedTest(Realm):
                         dlat.append(iter_block['download_lat'][j])
                         ulat.append(iter_block['upload_lat'][j])
                     else:
-                        # Not reported — fill with NA/0 and note it
                         host_label = host or ip or "(unknown)"
                         hostnames.append(host_label)
                         dls.append(0.0)
@@ -1671,6 +1620,7 @@ class SpeedTest(Realm):
                     # "IP": [dev["ip"] for dev in roster],   # uncomment if you want the IP column
                     "hostname": t_hostname,
                     "MAC": t_mac,
+                    "Device Type": t_type,
                     "SSID": t_ssid,
                     "Channel": t_channel,
                     "Download Speed (Mbps)": dls,
