@@ -166,7 +166,8 @@ class SpeedtestAdb:
             ]
         except (ValueError, AttributeError, Exception):
             # Fallback tap coordinates (hardcoded)
-            taps = [(530, 930), (360, 610), (540, 900), (580, 1000)]
+            taps = [(530, 930), (360, 610), (540, 900), (580, 1000),\
+                    (610,360), (360, 610), (370, 675)] # Tab Go button
 
         # Execute tap attempts
         for x, y in taps:
