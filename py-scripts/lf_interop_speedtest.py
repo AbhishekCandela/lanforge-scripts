@@ -46,7 +46,6 @@ class SpeedTest(Realm):
                 do_interopability=False,
                 dowebgui=False,
                 type='ookla',
-                upstream_port=None,
                 result_dir='local',
                 _debug_on=False):
         super().__init__(lfclient_host=manager_ip,
@@ -77,8 +76,8 @@ class SpeedTest(Realm):
 
         if self.dowebgui:
             print('Initiating Server for WebGUI Ingest')
-            self.change_port_to_ip(upstream_port)
-            self._post_url = f"http://{self.upstream_port}:5050/api/speedtest"
+            self.change_port_to_ip(self.manager_ip)
+            self._post_url = f"http://{self.manager_ip}:5050/api/speedtest"
             self._start_ingest_server() 
         #reporting variable
         self.selected_device_type = set()
@@ -606,9 +605,9 @@ class SpeedTest(Realm):
                 if dev_type == 'Linux/Interop':
                     self.devices_data[device]['cmd'] = f"DISPLAY=:1 ./vrf_exec.bash {device.split('.')[2]} python3 ookla.py --type {self.type}{' --post_url ' + self._post_url if self.dowebgui and self._post_url else ''} --ip {self.devices_data[device]['ip']}"
                 elif dev_type == 'Windows':
-                    self.devices_data[device]['cmd'] = f'py ookla.py --type {self.type}{" --post_url " + self._post_url if self.dowebgui and self._post_url else ""} --ip {self.devices_data[device]["ip"]}'
+                    self.devices_data[device]['cmd'] = f"py ookla.py --type {self.type}{" --post_url " + self._post_url if self.dowebgui and self._post_url else ''} --ip {self.devices_data[device]["ip"]}"
                 elif dev_type == 'Mac OS':
-                    self.devices_data[device]['cmd'] = f'python3 ookla.py --type {self.type}{" --post_url " + self._post_url if self.dowebgui and self._post_url else ""} --ip {self.devices_data[device]["ip"]}'
+                    self.devices_data[device]['cmd'] = f"python3 ookla.py --type {self.type}{" --post_url " + self._post_url if self.dowebgui and self._post_url else ''} --ip {self.devices_data[device]["ip"]}"
                 
                 # For ADB devices (override previous command if serial exists)
                 if self.devices_data[device].get("serial"):
@@ -729,6 +728,10 @@ class SpeedTest(Realm):
             self.generic_endps_profile.set_cmd(endp_name, cmd=self.laptop_data[endp_name.split('-')[1]]['cmd'])
 
         if self.android_data:
+            self.android_data = {
+                f"{v['port']}.{k}": v
+                for k, v in self.android_data.items()
+            }
             status, created_cx, created_endp = self.create_android(ports=list(self.android_data.keys()), real_client_os_types=device_types)
             self.generic_endps_profile.created_endp.extend(created_endp)
             self.generic_endps_profile.created_cx.extend(created_cx)
@@ -741,7 +744,6 @@ class SpeedTest(Realm):
 
 
     def create_android(self, ports=None, sleep_time=.5, debug_=False, suppress_related_commands_=None, real_client_os_types=None):
-
         if ports and real_client_os_types and len(real_client_os_types) == 0:
             logging.error('Real client operating systems types is empty list')
             raise ValueError('Real client operating systems types is empty list')
@@ -1746,11 +1748,6 @@ Key metrics collected include:
                         action='store_true',
                         help='cleans up generic cx after completion of the test')
     
-    required = parser.add_argument_group('Required arguments')
-    required.add_argument('--upstream_port',
-                        type=str,
-                        help='Upstream port to use for the test (e.g., 1.1.eth1)',
-                        required=True)
 
     #TODO Commented lines are for implementation of incremental testing.
     # optional.add_argument('--do_increment',
@@ -1779,7 +1776,6 @@ Key metrics collected include:
                             do_interopability=args.do_interopability,
                             result_dir=args.result_dir,
                             type=args.type,
-                            upstream_port=args.upstream_port,
                             dowebgui=args.dowebgui)
     speedtest_obj.get_resource_data()
     speedtest_obj.create()
